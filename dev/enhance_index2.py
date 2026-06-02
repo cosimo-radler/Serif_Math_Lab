@@ -1,9 +1,48 @@
+import re
 from pathlib import Path
 
 
 ORIGINAL = Path("/Users/cosimoradler/Documents/Codex/2026-06-02/files-mentioned-by-the-user-index/outputs/index_2_original_backup.html")
 SRC = ORIGINAL if ORIGINAL.exists() else Path("/Users/cosimoradler/Downloads/index_2.html")
 OUT = Path("/Users/cosimoradler/Documents/Codex/2026-06-02/files-mentioned-by-the-user-index/outputs/index_2_enhanced.html")
+
+
+THEME_CSS = r''':root{ --bg:#000; --ink:#fff; --mut:rgba(255,255,255,0.55); --mut2:rgba(255,255,255,0.35); --line:rgba(255,255,255,0.14); }
+html{background:#000;}
+html.theme-light{background:#fff;}
+html.theme-light body{filter:invert(1);}
+.theme-toggle{position:fixed;right:22px;top:22px;z-index:120;background:var(--bg);color:var(--ink);border:1px solid var(--mut2);padding:10px 14px;}
+@media(max-width:600px){.theme-toggle{right:14px;top:14px;padding:9px 12px;font-size:10px;}}
+'''
+
+
+THEME_HEAD_JS = r'''<script>
+(function(){
+  try{
+    if(localStorage.getItem("serif-theme")==="white"){
+      document.documentElement.classList.add("theme-light");
+    }
+  }catch(e){}
+})();
+</script>
+'''
+
+
+THEME_BODY_HTML = r'''<button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle dark and white mode">white mode</button>
+'''
+
+
+THEME_LOAD_JS = r'''  const themeToggle=document.getElementById("theme-toggle");
+  function syncThemeToggle(){
+    if(themeToggle) themeToggle.textContent=document.documentElement.classList.contains("theme-light")?"dark mode":"white mode";
+  }
+  syncThemeToggle();
+  if(themeToggle) themeToggle.onclick=()=>{
+    document.documentElement.classList.toggle("theme-light");
+    try{localStorage.setItem("serif-theme",document.documentElement.classList.contains("theme-light")?"white":"dark");}catch(e){}
+    syncThemeToggle();
+  };
+'''
 
 
 LAB_CSS = r'''
@@ -28,14 +67,41 @@ LAB_CSS = r'''
 .lab .actions{margin-top:0.8rem;}
 .lab .controls{margin-bottom:1.2rem;}
 .lab .controls{grid-template-columns:repeat(auto-fit,minmax(280px,1fr));}
+.param-canvas{width:130px;height:130px;border:1px solid var(--line);background:var(--bg);display:block;}
 @media(max-width:760px){.lab-top,.lab-stage{grid-template-columns:1fr}.readout{min-height:auto}}
+'''
+
+
+ANIM_ATTRACTOR_HTML = r'''
+<!-- animated attractor -->
+<section>
+  <div class="head"><h2>Animated strange attractor</h2></div>
+  <p class="desc">The same map, but now the parameters move. A point travels through the \((a,b)\) plane along different path functions, and the attractor breathes between states instead of being recast.</p>
+  <div class="eq">\[ x_{n+1}=\sin(x_n^2-y_n^2+a(t)),\qquad y_{n+1}=\cos(2x_ny_n+b(t)) \]\[ (a(t),b(t))=\gamma(t)\subset[-3,3]^2 \]</div>
+  <div class="stage">
+    <div class="cv-main"><canvas id="aa-cv"></canvas></div>
+    <div class="side">
+      <div class="over">(a, b) path</div>
+      <canvas class="param-canvas" id="aa-map"></canvas>
+      <div class="over" style="margin-top:8px;" id="aa-read">orbit</div>
+    </div>
+  </div>
+  <div class="controls">
+    <div class="ctl"><label>path</label><select id="aa-path"><option value="butterfly">butterfly</option><option value="supershape">supershape</option><option value="spiro">spirograph</option><option value="maurer">maurer rose</option><option value="knot">lissajous knot</option><option value="braid">orbital braid</option><option value="wander">smooth wander</option></select></div>
+    <div class="ctl"><label>speed</label><input id="aa-speed" type="range" min="0.05" max="1.2" step="0.01" value="0.28"><span class="val" id="aa-speedo">0.28</span></div>
+    <div class="ctl"><label>scale</label><input id="aa-scale" type="range" min="0.25" max="1" step="0.01" value="0.72"><span class="val" id="aa-scaleo">0.72</span></div>
+    <div class="ctl"><label>persistence</label><input id="aa-fade" type="range" min="0.78" max="0.985" step="0.005" value="0.93"><span class="val" id="aa-fadeo">0.930</span></div>
+    <div class="ctl"><label>density</label><input id="aa-density" type="range" min="0.45" max="1.6" step="0.05" value="1.0"><span class="val" id="aa-densityo">1.00</span></div>
+  </div>
+  <div class="actions"><button id="aa-play">pause</button><button id="aa-reset">reset field</button><button id="aa-dl">save png</button></div>
+</section>
 '''
 
 
 LAB_HTML = r'''
 <!-- 05 -->
 <section>
-  <div class="head"><span class="num">05</span><h2>The expanded equation lab</h2></div>
+  <div class="head"><h2>The expanded equation lab</h2></div>
   <p class="desc">Every system below is live. Some are ideal skeletons, some are fields, some are physical instabilities. The useful curves can be handed back to the brush in 04, so the mathematics can become residue.</p>
 
   <div class="lab-stack">
@@ -186,13 +252,13 @@ LAB_HTML = r'''
 
     <article class="lab" id="lab-thomas-wrap">
       <div class="lab-top">
-        <div><h3>Thomas attractor</h3><p class="one">A cyclic system: each axis is driven by the sine of another and damped by itself. The result is a knot of soft turbulence.</p></div>
+        <div><h3>Thomas attractor</h3><p class="one">A cyclic system: each axis is driven by the sine of another and damped by itself. The better-tuned form reads as a soft three-lobed knot.</p></div>
         <div class="ceq">\( \dot{x}=\sin y-bx,\quad \dot{y}=\sin z-by,\quad \dot{z}=\sin x-bz \)</div>
       </div>
       <div class="lab-stage"><div class="three-stage" id="tho-3d"></div><div class="readout"><div class="over">cyclic drift</div><p id="tho-note">Lower damping lets the orbit swell; higher damping tightens the knot.</p></div></div>
       <div class="controls">
-        <div class="ctl"><label>b</label><input id="tho-b" type="range" min="0.12" max="0.35" step="0.005" value="0.19"><span class="val" id="tho-bo">0.190</span></div>
-        <div class="ctl"><label>trail</label><input id="tho-trail" type="range" min="800" max="6200" step="100" value="3600"><span class="val" id="tho-trailo">3600</span></div>
+        <div class="ctl"><label>b</label><input id="tho-b" type="range" min="0.12" max="0.35" step="0.001" value="0.208"><span class="val" id="tho-bo">0.208</span></div>
+        <div class="ctl"><label>trail</label><input id="tho-trail" type="range" min="1600" max="9000" step="100" value="6200"><span class="val" id="tho-trailo">6200</span></div>
       </div>
       <div class="actions"><button id="tho-play">play damping</button><button id="tho-reset">reset trail</button><button id="tho-brush">brush projection</button></div>
     </article>
@@ -240,6 +306,101 @@ LAB_HTML = r'''
 
   </div>
 </section>
+'''
+
+
+ANIM_ATTRACTOR_JS = r'''
+/* ---------- ANIMATED STRANGE ATTRACTOR ---------- */
+function animatedAttractor(){
+  const cv=$("aa-cv"), map=$("aa-map"); if(!cv||!map) return;
+  const ctx=cv.getContext("2d"), mctx=map.getContext("2d");
+  let DPR=1,res=560,dens,out,buf,K=9000,Kmax=15000,X,Y,a=-1.7,b=0.65,ta=a,tb=b,t=0,active=false,running=true,raf=0,last=0,maxd=1;
+  const span=1.18, spline=[[-2.65,.85],[-1.55,2.25],[.35,1.35],[1.75,-.2],[.6,-2.1],[-1.9,-1.25]];
+  function size(){
+    DPR=Math.min(2,window.devicePixelRatio||1);
+    const css=Math.min(680,Math.max(320,cv.clientWidth||560));
+    res=Math.round(css*DPR); cv.width=res; cv.height=res; cv.style.height=css+"px";
+    dens=new Float32Array(res*res); out=ctx.createImageData(res,res); buf=out.data;
+    Kmax=15000; X=new Float32Array(Kmax); Y=new Float32Array(Kmax); K=Math.round(7000*(+$("aa-density").value)); seed();
+    map.width=Math.round(130*DPR); map.height=Math.round(130*DPR); map.style.height="130px"; drawMap();
+  }
+  function seedRange(from,to){ for(let i=from;i<to;i++){ X[i]=Math.random()*2-1; Y[i]=Math.random()*2-1; } }
+  function seed(){ seedRange(0,K); if(dens) dens.fill(0); maxd=1; for(let w=0;w<30;w++) adv(false); }
+  function setDensity(){
+    const next=Math.max(1200,Math.min(Kmax,Math.round(7000*(+$("aa-density").value))));
+    if(next>K) seedRange(K,next);
+    K=next;
+    for(let w=0;w<10;w++) adv(true);
+    render();
+  }
+  function spl(u){ const n=spline.length, p=u*n, i=Math.floor(p)%n, f=p-i, p0=spline[(i+n-1)%n], p1=spline[i], p2=spline[(i+1)%n], p3=spline[(i+2)%n], q=[]; for(let k=0;k<2;k++){ const v=.5*((2*p1[k])+(-p0[k]+p2[k])*f+(2*p0[k]-5*p1[k]+4*p2[k]-p3[k])*f*f+(-p0[k]+3*p1[k]-3*p2[k]+p3[k])*f*f*f); q[k]=v; } return q; }
+  function clampPath(x,y){ return [Math.max(-2.86,Math.min(2.86,x)),Math.max(-2.86,Math.min(2.86,y))]; }
+  function path(tt){
+    const s=+$("aa-scale").value, mode=$("aa-path").value, u=(tt*0.16)%1, p=2*Math.PI*u;
+    let x,y,r;
+    if(mode==="butterfly"){
+      r=Math.exp(Math.sin(p))-2*Math.cos(4*p)+Math.pow(Math.sin((2*p-Math.PI)/24),5);
+      x=.22+s*.78*r*Math.sin(p); y=.08+s*.78*r*Math.cos(p); return clampPath(x,y);
+    }
+    if(mode==="supershape"){
+      const m=7,n1=.28+.08*Math.sin(tt*.17),n2=1.7,n3=1.7;
+      r=Math.pow(Math.pow(Math.abs(Math.cos(m*p/4)),n2)+Math.pow(Math.abs(Math.sin(m*p/4)),n3),-1/n1);
+      x=-.24+s*1.95*r*Math.cos(p); y=.04+s*1.95*r*Math.sin(p); return clampPath(x,y);
+    }
+    if(mode==="spiro"){
+      const R=1.28, rr=.43, d=1.28, q=p*2.4;
+      x=-.25+s*((R-rr)*Math.cos(q)+d*Math.cos((R-rr)/rr*q));
+      y=.12+s*((R-rr)*Math.sin(q)-d*Math.sin((R-rr)/rr*q)); return clampPath(x,y);
+    }
+    if(mode==="maurer"){
+      const q=p*2.9, rr=Math.sin(6*q);
+      x=-.45+s*(2.45*rr*Math.cos(q)+.35*Math.sin(11*q));
+      y=.05+s*(2.45*rr*Math.sin(q)+.35*Math.cos(7*q)); return clampPath(x,y);
+    }
+    if(mode==="knot"){
+      x=-.45+s*(1.75*Math.sin(3*p+.4)+.72*Math.sin(7*p+1.7));
+      y=.1+s*(1.65*Math.sin(4*p+1.1)+.55*Math.sin(9*p)); return clampPath(x,y);
+    }
+    if(mode==="braid"){
+      x=-.55+s*(1.35*Math.cos(p)+.95*Math.cos(2.7*p+1.2)+.35*Math.sin(8*p));
+      y=.05+s*(1.25*Math.sin(1.4*p)+.88*Math.sin(3*p+.5)); return clampPath(x,y);
+    }
+    return clampPath(-.65+s*(1.6*Math.sin(p)+.8*Math.sin(2.7*p+1.6)), .15+s*(1.45*Math.cos(1.3*p)+.65*Math.sin(3.1*p)));
+  }
+  function mapXY(q){ return [((q[0]+3)/6)*map.width, ((3-q[1])/6)*map.height]; }
+  function drawMap(){
+    const w=map.width,h=map.height; mctx.setTransform(1,0,0,1,0,0); mctx.fillStyle="#000"; mctx.fillRect(0,0,w,h);
+    mctx.strokeStyle="rgba(242,239,232,.16)"; mctx.lineWidth=Math.max(1,DPR); for(let i=1;i<4;i++){ const p=i*w/4; mctx.beginPath(); mctx.moveTo(p,0); mctx.lineTo(p,h); mctx.moveTo(0,p); mctx.lineTo(w,p); mctx.stroke(); }
+    mctx.strokeStyle="rgba(242,239,232,.48)"; mctx.lineWidth=Math.max(1,DPR); mctx.beginPath();
+    for(let i=0;i<=360;i++){ const q=path((i/360)/.16), p=mapXY(q); if(i)mctx.lineTo(p[0],p[1]); else mctx.moveTo(p[0],p[1]); } mctx.stroke();
+    const p=mapXY([a,b]); mctx.fillStyle="#f2efe8"; mctx.beginPath(); mctx.arc(p[0],p[1],4*DPR,0,7); mctx.fill();
+    $("aa-read").textContent=$("aa-path").value+"  a "+a.toFixed(2)+" / b "+b.toFixed(2);
+  }
+  function adv(splat){
+    for(let i=0;i<K;i++){ const x=X[i],y=Y[i],xn=Math.sin(x*x-y*y+a),yn=Math.cos(2*x*y+b); X[i]=xn; Y[i]=yn;
+      if(splat){ const px=((xn+span)/(2*span)*(res-1))|0, py=((yn+span)/(2*span)*(res-1))|0; if(px>=0&&px<res&&py>=0&&py<res){ const id=py*res+px,v=(dens[id]+=1); if(v>maxd) maxd=v; } }
+    }
+  }
+  function fade(){ const keep=+$("aa-fade").value; maxd=1; for(let i=0;i<dens.length;i++){ const v=dens[i]*keep; dens[i]=v; if(v>maxd)maxd=v; } }
+  function render(){
+    const lm=Math.log(1+maxd); for(let i=0;i<res*res;i++){ let L=lm>0?Math.log(1+dens[i])/lm:0; L=Math.pow(L,.56); const j=i*4,c=L*255; buf[j]=INK[0]/255*c; buf[j+1]=INK[1]/255*c; buf[j+2]=INK[2]/255*c; buf[j+3]=255; }
+    ctx.putImageData(out,0,0);
+  }
+  function loop(now){
+    if(!active){ raf=requestAnimationFrame(loop); return; }
+    const dt=Math.min(.05,(now-last)/1000||.016); last=now;
+    if(running){ t+=dt*(+$("aa-speed").value); const q=path(t); ta=q[0]; tb=q[1]; a+=(ta-a)*.085; b+=(tb-b)*.085; fade(); for(let s=0;s<8;s++) adv(true); render(); drawMap(); }
+    raf=requestAnimationFrame(loop);
+  }
+  ["aa-speed","aa-scale","aa-fade","aa-density"].forEach(id=>$(id).addEventListener("input",e=>{ const n=id==="aa-fade"?3:2; $(id+"o").textContent=(+e.target.value).toFixed(n); if(id==="aa-density") setDensity(); drawMap(); }));
+  $("aa-path").onchange=()=>drawMap();
+  $("aa-play").onclick=()=>{ running=!running; $("aa-play").textContent=running?"pause":"play"; };
+  $("aa-reset").onclick=()=>seed();
+  $("aa-dl").onclick=()=>download(cv.toDataURL("image/png"),"serif_animated_attractor.png");
+  window.addEventListener("resize",size); size(); render();
+  inView(cv,vis=>{ active=vis; if(vis){last=performance.now(); cancelAnimationFrame(raf); loop(last);} });
+}
+
 '''
 
 
@@ -398,7 +559,7 @@ function fieldLab(){
   cv.addEventListener("pointermove",e=>{ if(drag<0) return; const r=cv.getBoundingClientRect(); poles[drag].x=Math.max(.05,Math.min(.95,(e.clientX-r.left)/r.width)); poles[drag].y=Math.max(.05,Math.min(.95,(e.clientY-r.top)/r.height)); draw(); });
   window.addEventListener("pointerup",()=>drag=-1);
   bindInputs(["vf-strength","vf-lines"],draw);
-  let vfLast=0; motionButton("vf-play","stop poles",t=>{ if(t-vfLast<0.05) return; vfLast=t; poles[0].x=.33+.12*Math.sin(t*.7); poles[0].y=.5+.16*Math.cos(t*.53); poles[1].x=.67+.12*Math.sin(t*.61+2); poles[1].y=.5+.16*Math.cos(t*.47+1); draw(); });
+  let vfLast=0; motionButton("vf-play","stop poles",t=>{ if(t-vfLast<0.03) return; vfLast=t; poles[0].x=.5+.28*Math.cos(t*.62); poles[0].y=.5+.22*Math.sin(t*.74); poles[1].x=.5+.28*Math.cos(t*.62+Math.PI); poles[1].y=.5+.22*Math.sin(t*.74+Math.PI); draw(); });
   $id("vf-flip").onclick=()=>{ poles[1].q*=-1; draw(); };
   $id("vf-reset").onclick=()=>{ poles=[{x:.34,y:.5,q:1},{x:.66,y:.5,q:-1}]; draw(); };
   $id("vf-dl").onclick=()=>dlCanvas(cv,"serif_vector_field.png");
@@ -449,8 +610,8 @@ function attractor3(container, kind){
       let dx,dy,dz;
       if(kind==="lor"){ const sig=val("lor-s"),rho=val("lor-r"),beta=val("lor-b"); dx=sig*(y-x); dy=x*(rho-z)-y; dz=x*y-beta*z; dt=.006; }
       else if(kind==="ros"){ const a=val("ros-a"),b=val("ros-b"),c=val("ros-c"); dx=-(y+z); dy=x+a*y; dz=b+z*(x-c); dt=.018; }
-      else { const b=val("tho-b"); dx=Math.sin(y)-b*x; dy=Math.sin(z)-b*y; dz=Math.sin(x)-b*z; dt=.045; }
-      x+=dx*dt; y+=dy*dt; z+=dz*dt; if(i>80) pts.push([x,y,z]);
+      else { const b=val("tho-b"); dx=Math.sin(y)-b*x; dy=Math.sin(z)-b*y; dz=Math.sin(x)-b*z; dt=.035; }
+      x+=dx*dt; y+=dy*dt; z+=dz*dt; if(i>(kind==="tho"?220:80)) pts.push([x,y,z]);
     }
     let max=0; for(const p of pts) max=Math.max(max,Math.abs(p[0]),Math.abs(p[1]),Math.abs(p[2])); const sc=1.65/(max||1);
     pts=pts.map(p=>[p[0]*sc,p[1]*sc,p[2]*sc]); s.root.add(lineObj(pts));
@@ -467,7 +628,7 @@ function phyllo3(){
   bindInputs(["ph-ang","ph-count","ph-shell"],draw); $id("ph-golden").onclick=()=>{$id("ph-ang").value=137.507; draw();}; $id("ph-brush").onclick=()=>{ const N=700,ang=val("ph-ang")*Math.PI/180,pts=[]; for(let i=0;i<N;i++){ const r=Math.sqrt(i); pts.push([r*Math.cos(i*ang),r*Math.sin(i*ang)]); } sendBrush("custom phyllotaxis",pts); }; function loop(){ if(s.active){ s.root.rotation.y+=0.002; s.render(); } requestAnimationFrame(loop); } draw(); loop();
 }
 function chladni3(){
-  const s=makeThreeStage("ch-3d"); if(!s) return; function draw(){ clear3(s); ["ch-n","ch-m"].forEach(id=>fmt(id,0)); fmt("ch-height",2); const n=val("ch-n"),m=val("ch-m"),H=val("ch-height"), seg=70, verts=[], idx=[]; for(let y=0;y<=seg;y++)for(let x=0;x<=seg;x++){ const u=x/seg,v=y/seg,xx=(u-.5)*3,yy=(v-.5)*3,z=(Math.cos(n*Math.PI*u)*Math.cos(m*Math.PI*v)-Math.cos(m*Math.PI*u)*Math.cos(n*Math.PI*v))*H; verts.push(xx,yy,z); } for(let y=0;y<seg;y++)for(let x=0;x<seg;x++){ const a=y*(seg+1)+x; idx.push(a,a+1,a+seg+1,a+1,a+seg+2,a+seg+1); } const geo=new THREE.BufferGeometry(); geo.setAttribute("position",new THREE.Float32BufferAttribute(verts,3)); geo.setIndex(idx); geo.computeVertexNormals(); const mat=new THREE.MeshBasicMaterial({color:0xf2efe8,wireframe:true,transparent:true,opacity:.36}); s.root.add(new THREE.Mesh(geo,mat)); }
+  const s=makeThreeStage("ch-3d"); if(!s) return; function draw(){ clear3(s); ["ch-n","ch-m"].forEach(id=>fmt(id,0)); fmt("ch-height",2); const n=val("ch-n"),m=val("ch-m"),H=val("ch-height"), seg=112, verts=[], idx=[]; for(let y=0;y<=seg;y++)for(let x=0;x<=seg;x++){ const u=x/seg,v=y/seg,xx=(u-.5)*3,yy=(v-.5)*3,z=(Math.cos(n*Math.PI*u)*Math.cos(m*Math.PI*v)-Math.cos(m*Math.PI*u)*Math.cos(n*Math.PI*v))*H; verts.push(xx,yy,z); } for(let y=0;y<seg;y++)for(let x=0;x<seg;x++){ const a=y*(seg+1)+x; idx.push(a,a+1,a+seg+1,a+1,a+seg+2,a+seg+1); } const geo=new THREE.BufferGeometry(); geo.setAttribute("position",new THREE.Float32BufferAttribute(verts,3)); geo.setIndex(idx); geo.computeVertexNormals(); const surf=new THREE.MeshBasicMaterial({color:0xf2efe8,transparent:true,opacity:.075,side:THREE.DoubleSide}); const wire=new THREE.MeshBasicMaterial({color:0xf2efe8,wireframe:true,transparent:true,opacity:.22}); s.root.add(new THREE.Mesh(geo,surf)); s.root.add(new THREE.Mesh(geo,wire)); }
   bindInputs(["ch-n","ch-m","ch-height"],draw); let chLast=0; motionButton("ch-play","stop modes",t=>{ if(t-chLast<0.18) return; chLast=t; setCtl("ch-n",2+((t*1.8)|0)%8,0); setCtl("ch-m",3+((t*1.25+2)|0)%8,0); setCtl("ch-height",.45+.55*(.5+.5*Math.sin(t*1.1)),2); draw(); s.nudge(.012,.003); s.render(); }); $id("ch-swap").onclick=()=>{ const n=$id("ch-n").value; $id("ch-n").value=$id("ch-m").value; $id("ch-m").value=n; draw();}; $id("ch-rand").onclick=()=>{ $id("ch-n").value=1+(Math.random()*10|0); $id("ch-m").value=1+(Math.random()*10|0); draw();}; function loop(){ if(s.active) s.render(); requestAnimationFrame(loop); } draw(); loop();
 }
 function torus3(){
@@ -488,7 +649,7 @@ function equationLabs(){
   ["tho-b","tho-trail"].forEach(id=>$id(id).addEventListener("input",()=>{fmt(id,id==="tho-b"?3:0); tho.reset();}));
   let lorLast=0; motionButton("lor-play","stop weather",t=>{ if(t-lorLast<0.42) return; lorLast=t; setCtl("lor-r",29+10*Math.sin(t*.32),1); setCtl("lor-s",10+2.8*Math.sin(t*.21+1),1); lor.reset(); },v=>lor.setPlay(v));
   let rosLast=0; motionButton("ros-play","stop fold",t=>{ if(t-rosLast<0.46) return; rosLast=t; setCtl("ros-c",5.8+2.5*Math.sin(t*.28),1); setCtl("ros-a",.22+.12*Math.sin(t*.19+2),2); ros.reset(); },v=>ros.setPlay(v));
-  let thoLast=0; motionButton("tho-play","stop damping",t=>{ if(t-thoLast<0.42) return; thoLast=t; setCtl("tho-b",.205+.055*Math.sin(t*.38),3); tho.reset(); },v=>tho.setPlay(v));
+  let thoLast=0; motionButton("tho-play","stop damping",t=>{ if(t-thoLast<0.42) return; thoLast=t; setCtl("tho-b",.208+.035*Math.sin(t*.38),3); tho.reset(); },v=>tho.setPlay(v));
   $id("lor-reset").onclick=()=>lor.reset(); $id("ros-reset").onclick=()=>ros.reset(); $id("tho-reset").onclick=()=>tho.reset();
   $id("lor-brush").onclick=()=>sendBrush("custom lorenz",lor.project());
   $id("ros-brush").onclick=()=>sendBrush("custom rossler",ros.project());
@@ -502,11 +663,20 @@ window.addEventListener("load",equationLabs);
 
 def main():
     html = SRC.read_text()
+    html = re.sub(r'<span class="num">\d+</span>', '', html)
+    html = html.replace(
+        ':root{ --bg:#000; --ink:#f2efe8; --mut:rgba(242,239,232,0.55); --mut2:rgba(242,239,232,0.35); --line:rgba(242,239,232,0.14); }',
+        THEME_CSS,
+    )
+    html = html.replace('</head>', THEME_HEAD_JS + '\n</head>', 1)
+    html = html.replace('<body>', '<body>\n' + THEME_BODY_HTML, 1)
 
     html = html.replace(
         '.card .ceq::-webkit-scrollbar{height:4px;}.card .ceq::-webkit-scrollbar-thumb{background:var(--mut2);}\n',
         '.card .ceq::-webkit-scrollbar{height:4px;}.card .ceq::-webkit-scrollbar-thumb{background:var(--mut2);}\n' + LAB_CSS + '\n',
     )
+
+    html = html.replace('\n<!-- 02 -->', '\n' + ANIM_ATTRACTOR_HTML + '\n<!-- 02 -->', 1)
 
     start = html.index('<!-- 05 -->')
     end = html.index('\n<footer>', start)
@@ -516,7 +686,23 @@ def main():
     new = 'const sel=$("br-curve").value, raw=(sel==="custom"&&window.serifBrushPath)?window.serifBrushPath:(sel==="S"?curveS():sel==="harmonograph"?curveH():curveL());'
     html = html.replace(old, new)
 
+    html = html.replace(
+        'function ink(s,al){ const p=pos(s); if(s.px!=null){ ctx.strokeStyle="rgba(242,239,232,"+al+")"; ctx.lineWidth=weight; ctx.lineCap="round";\n'
+        '    ctx.beginPath(); ctx.moveTo(s.px,s.py); ctx.lineTo(p.x2,p.y2); ctx.stroke(); } s.px=p.x2; s.py=p.y2; }',
+        'function ink(s,al,col){ const p=pos(s); if(s.px!=null){ ctx.strokeStyle=col||"rgba(242,239,232,"+al+")"; ctx.lineWidth=weight; ctx.lineCap="round"; ctx.lineJoin="round";\n'
+        '    ctx.beginPath(); ctx.moveTo(s.px,s.py); ctx.lineTo(p.x2,p.y2); ctx.stroke(); } s.px=p.x2; s.py=p.y2; }'
+    )
+    html = html.replace(
+        'function loop(){ if(!active) return; if(running&&A){ for(let i=0;i<6;i++){ step(A,0.012); ink(A,0.5); if(B){step(B,0.012);ink(B,0.5);} } } raf=requestAnimationFrame(loop); }',
+        'function loop(){ if(!active) return; if(running&&A){ for(let i=0;i<14;i++){ step(A,0.0052); ink(A,0.38); if(B){step(B,0.0052);ink(B,0.54,"rgba(120,185,210,0.58)");} } } raf=requestAnimationFrame(loop); }'
+    )
+
+    html = html.replace('/* ---------- 02 HARMONOGRAPH ---------- */', ANIM_ATTRACTOR_JS + '/* ---------- 02 HARMONOGRAPH ---------- */')
+    html = html.replace('attractor(); harmonograph(); pendulum(); brush(); thumbs();', 'attractor(); animatedAttractor(); harmonograph(); pendulum(); brush(); thumbs();')
+    html = html.replace('window.addEventListener("load",()=>{\n', 'window.addEventListener("load",()=>{\n' + THEME_LOAD_JS, 1)
+
     html = html.replace('\n</body>\n</html>\n', '\n' + LAB_JS + '\n</body>\n</html>\n')
+    html = html.replace('f2efe8', 'ffffff').replace('242,239,232', '255,255,255').replace('242, 239, 232', '255, 255, 255')
 
     OUT.write_text(html)
     print(OUT)
